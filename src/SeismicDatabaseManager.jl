@@ -10,4 +10,6 @@ include("Event.jl")
 
 include("Trace.jl")
 
+include("VelocityModel.jl")
+
 end # module SeismicDatabaseManager
