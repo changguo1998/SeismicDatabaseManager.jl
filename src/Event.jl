@@ -1,7 +1,9 @@
+# Event
 struct Event
-    location::SeisTools.Geodesy.Point
-    origin::DateTime
+    ot::DateTime
     mag::Float64
+    src::Source
+    devs::Vector{Device}
 end
 
 export Event
