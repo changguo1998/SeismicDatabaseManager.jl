@@ -8,8 +8,6 @@ include("BasicTypes.jl")
 
 include("Event.jl")
 
-include("Trace.jl")
-
-include("VelocityModel.jl")
+include("GreenLibrary.jl")
 
 end # module SeismicDatabaseManager
