@@ -3,7 +3,7 @@ struct Event
     ot::DateTime
     mag::Float64
     src::Source
-    devs::Vector{Device}
+    rcvs::Vector{Receiver}
 end
 
 export Event
