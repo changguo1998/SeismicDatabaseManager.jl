@@ -1,3 +1,4 @@
+
 """
 ```julia
 module SeismicDatabaseManager
@@ -15,13 +16,12 @@ module SeismicDatabaseManager
 
 using SeisTools, Dates, LengthAreaVolume, TOML
 
-
 _DP = SeisTools.DataProcess
 
 include("BasicTypes.jl")
-
+include("Receiver.jl")
+include("Source.jl")
 include("Event.jl")
-
 include("GreenLibrary.jl")
 
 end # module SeismicDatabaseManager
