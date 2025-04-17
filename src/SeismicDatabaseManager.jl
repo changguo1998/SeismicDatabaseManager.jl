@@ -3,7 +3,7 @@
 ```julia
 module SeismicDatabaseManager
 ```
-This module provides a high level data interface
+This module provides a high level data interface to manage seismic data on disk.
 
 Direction definition
 - latitude / x positive to north

@@ -3,7 +3,7 @@
 TIME_PRECISION = Microsecond(1)
 SECOND_PRECISION_RATIO = Second(1) / TIME_PRECISION
 
-LongAgo = DateTime(1800)
+const LongAgo = DateTime(1800)
 
 export LongAgo
 
@@ -99,4 +99,64 @@ end
 function _interp1_linear(p::Vector{Float64}, x::Float64)
     (i, c) = _interp_linear_coef(x, p)
     return p[i] * (1.0 - c) + p[i+1] * c
+end
+
+const _REF_JULIAN   = 2455000.5
+const _REF_DATETIME = julian2datetime(_REF_JULIAN)
+const _REF_YEAR     = year(_REF_DATETIME)
+const _REF_MONTH    = month(_REF_DATETIME)
+const _REF_DAY      = day(_REF_DATETIME)
+const _CHAR_SET     = Tuple([collect('A':'Z'); collect('a':'z'); collect('0':'9')])
+
+function _areacode_f2s(x::Real, r::Real, level::Integer)
+    t = mod(x, r)
+    ilist = zeros(Int, level)
+    for i = 1:level
+        r /= 60.0
+        st = floor(Int, t / r)
+        ilist[i] = st + 1
+        t = mod(t, r)
+    end
+    return (join(map(_i -> _CHAR_SET[_i], ilist)), t)
+end
+
+function _areacode_s2f(s::String, dr::Real)
+    f3 = Int(s[3] - '0') * 0.01
+    i1 = findfirst(s[1] .== _CHAR_SET)
+    i2 = findfirst(s[2] .== _CHAR_SET)
+    return f3 + dr * (i2 - 1) + dr * 60.0 * (i1 - 1)
+end
+
+function encode_ll(lat::Real, lon::Real)
+    (slat, rlat) = _areacode_f2s(90.0 - lat, 180.0, 2)
+    (slon, rlon) = _areacode_f2s(180.0 + lon, 360.0, 2)
+    clat = string(round(Int, rlat / 0.01))
+    clon = string(round(Int, rlon / 0.01))
+    return slat * clat * slon * clon
+end
+
+function decode_ll(s::String)
+    t = _areacode_s2f(String(s[1:3]), 0.05)
+    p = _areacode_s2f(String(s[4:6]), 0.1)
+    return (round(90.0 - t; digits = 2), round(p - 180.0; digits = 2))
+end
+
+function encode_event(lat::Real, lon::Real, ot::DateTime)
+    cloc = encode_ll(lat, lon)
+    timediff = datetime2julian(ot) - _REF_JULIAN
+    cday = string(floor(Int, timediff); pad = 4)
+    chour = _CHAR_SET[hour(ot)+1]
+    cmin = _CHAR_SET[minute(ot)+1]
+    csec = _CHAR_SET[second(ot)+1]
+    return join([cloc, cday, chour, cmin, csec])
+end
+
+function decode_event(str::String)
+    (lat, lon) = decode_ll(str[1:6])
+    nday = parse(Int, str[7:end-3])
+    h = findfirst(str[end-2] .== _CHAR_SET) - 1
+    m = findfirst(str[end-1] .== _CHAR_SET) - 1
+    s = findfirst(str[end] .== _CHAR_SET) - 1
+    return (lat, lon, DateTime(_REF_YEAR, _REF_MONTH, _REF_DAY, h, m, s) +
+                      Day(nday))
 end
