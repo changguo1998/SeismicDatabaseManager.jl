@@ -24,3 +24,13 @@ docs/site/
 Manifest.toml
 .vscode
 .ra
+*.bin
+srtm*
+*.tar.gz
+*.csv
+*.f
+*.vp
+*.vs
+*.rho
+*.bnds
+buffer/
