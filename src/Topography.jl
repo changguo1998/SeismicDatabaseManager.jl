@@ -105,7 +105,7 @@ struct DEM <: DigitalElevationModel
 end
 
 function DEM(dir_or_nm::String;
-             max_single_block_memory::Integer = 1024 * 1024 * 256, # 128 Mb
+             max_single_block_memory::Integer = 1024 * 1024 * 256, # 256 Mb
              max_total_memory::Integer = 1024 * 1024 * 1024)
     dir = ""
     if isdir(dir_or_nm)
@@ -172,8 +172,9 @@ function srtm_download_block(lat::Real, lon::Real)
         @info "block data $blockfilename already exists"
     else
         @info "downloading block data $blockfilename"
+        mkpath(srtm_dir("raw_data"))
         Downloads.download(url_s, dat_s)
-        @info "block data saved to $dat_s"
+        @info "block data saved to $dat_s, run `srtm_build_db()` to flush cache"
     end
     return nothing
 end
@@ -197,23 +198,28 @@ function _read_asc_header(fn::String)
 end
 
 function srtm_build_db()
-    zip_files = readdir(srtm_dir("raw_data"))
-
-    for zf in zip_files
+    for zf in readdir(srtm_dir("raw_data"))
         local ascf = replace(zf, ".zip"=>".asc")
         if isfile(srtm_dir("buffer", ascf))
             continue
         end
-        cmd = Cmd(["unzip", "-o", srtm_dir("raw_data", zf), "-d", srtm_dir("buffer")])
-        run(cmd)
+        mkpath(srtm_dir("buffer"))
+        @info "Unpack $zf"
+        rfs = ZipFile.Reader(srtm_dir("raw_data", zf))
+        for rf in rfs.files
+            open(srtm_dir("buffer", rf.name), "w") do io
+                write(io, read(rf))
+            end
+        end
+        close(rfs)
     end
 
-    ascfiles = filter(endswith(".asc"), srtm_dir("buffer"))
+    ascfiles = filter(endswith(".asc"), readdir(srtm_dir("buffer")))
     for af in ascfiles
         @info "Build block database: $af"
         local splitnm = splitext(af)
         local newname = "block_" * splitnm[1] * ".bin"
-        if isfile(newname)
+        if isfile(srtm_dir(newname))
             continue
         end
         local nrow, ncol, olat, olon, dd, nanvalue
@@ -230,5 +236,6 @@ function srtm_build_db()
         _write_f64_array(io, m)
         close(io)
     end
+    @info "Done"
     return nothing
 end

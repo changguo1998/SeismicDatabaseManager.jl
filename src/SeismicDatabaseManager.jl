@@ -14,7 +14,7 @@ See `Source`, `Receiver`, `Event`, `GreenLibrary` for their usage
 """
 module SeismicDatabaseManager
 
-using SeisTools, Dates, LengthAreaVolume, TOML, Mmap, Downloads, Printf, DelimitedFiles
+using SeisTools, Dates, LengthAreaVolume, TOML, Mmap, Downloads, Printf, DelimitedFiles, ZipFile, Tar, CodecZlib
 
 import Base: Matrix, close
 

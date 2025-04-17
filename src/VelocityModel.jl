@@ -434,8 +434,10 @@ end
 function crust1_0_build_db()
     @info "Build CRUST1.0"
     mkpath(crust1_0_dir("buffer"))
-    cmd = Cmd(Cmd(["tar", "xzf", "CRUST1.tar.gz", "-C", crust1_0_dir("buffer")]); dir=crust1_0_dir())
-    run(cmd)
+
+    st = GzipDecompressorStream(open(crust1_0_dir("CRUST1.tar.gz")); stop_on_end=true)
+    Tar.extract(st, crust1_0_dir("buffer"))
+    close(st)
 
     lats = collect(range(89.5, -89.5, 180))
     lons = collect(range(-179.5, 179.5, 360))
