@@ -1,8 +1,3 @@
-module VelocityModel
-
-import Base: Matrix
-
-include("basic.jl")
 
 """
 `AbstractVelocityModel` including velocity model types as below:
@@ -364,4 +359,222 @@ struct Irregular3D <: AbstractVelocityModel
     dens::Matrix{Float64}
 end
 
+
+# =============================
+# AK135
+# =============================
+ak135_dir(p...) = abspath(DATABASE_PATH, "VelocityModel", "AK135", p...)
+
+function ak135_download()
+    if !isfile(ak135_dir("AK135.csv"))
+        @info "Download AK135"
+        mkpath(ak135_dir())
+        Downloads.download("http://ds.iris.edu/files/products/emc/data/AK135F/AK135F_AVG.csv", ak135_dir("AK135.csv"))
+    end
+    return nothing
+end
+
+function ak135_build_db()
+    @info "Build AK135"
+    x = readdlm(ak135_dir("AK135.csv"), ',')
+
+    flag_diff = map(axes(x, 1)) do i
+        if i == 1
+            return true
+        end
+        return !(x[i,2:end] == x[i-1,2:end])
+    end
+
+    y = x[flag_diff, :]
+
+    d   = y[:, 1]
+    r = d[end] .- d
+    rho = y[:, 2]
+    vp  = y[:, 3]
+    vs  = y[:, 4]
+    Qk  = y[:, 5]
+    Qm  = y[:, 6]
+
+    io1 = open(ak135_dir("flat.bin"), "w")
+    write(io1, Int64(6))
+    _write_f64_vector!(io1, d)
+    _write_f64_vector!(io1, vp)
+    _write_f64_vector!(io1, vs)
+    _write_f64_vector!(io1, rho)
+    _write_f64_vector!(io1, Qk)
+    _write_f64_vector!(io1, Qm)
+    close(io1)
+
+    io2 = open(ak135_dir("sphere.bin"), "w")
+    write(io2, Int64(6))
+    _write_f64_vector!(io2, reverse(r))
+    _write_f64_vector!(io2, reverse(vp))
+    _write_f64_vector!(io2, reverse(vs))
+    _write_f64_vector!(io2, reverse(rho))
+    _write_f64_vector!(io2, reverse(Qk))
+    _write_f64_vector!(io2, reverse(Qm))
+    close(io2)
+    return nothing
+end
+
+# =============================
+# CRUST1.0
+# =============================
+crust1_0_dir(p...) = abspath(DATABASE_PATH, "VelocityModel", "CRUST1.0", p...)
+
+function crust1_0_download()
+    if !isfile(crust1_0_dir("CRUST1.tar.gz"))
+        @info "Download CRUST1.0"
+        mkpath(crust1_0_dir())
+        Downloads.download("http://igppweb.ucsd.edu/~gabi/crust1/crust1.0.tar.gz", crust1_0_dir("CRUST1.tar.gz"))
+    end
+    return nothing
+end
+
+function crust1_0_build_db()
+    @info "Build CRUST1.0"
+    mkpath(crust1_0_dir("buffer"))
+    cmd = Cmd(Cmd(["tar", "xzf", "CRUST1.tar.gz", "-C", crust1_0_dir("buffer")]); dir=crust1_0_dir())
+    run(cmd)
+
+    lats = collect(range(89.5, -89.5, 180))
+    lons = collect(range(-179.5, 179.5, 360))
+    bndsr = readdlm(crust1_0_dir("buffer", "crust1.bnds"))
+    rhor = readdlm(crust1_0_dir("buffer", "crust1.rho"))
+    vpr = readdlm(crust1_0_dir("buffer", "crust1.vp"))
+    vsr = readdlm(crust1_0_dir("buffer", "crust1.vs"))
+
+    dep = zeros(Float64, 9, 360, 180)
+    rho = zeros(Float64, 9, 360, 180)
+    vp  = zeros(Float64, 9, 360, 180)
+    vs  = zeros(Float64, 9, 360, 180)
+
+    for ilat = eachindex(lats), ilon = eachindex(lons)
+        itable = ilon + (ilat - 1) * 360
+        for idep = 1:9
+            dep[idep, ilon, 181 - ilat] = -bndsr[itable, idep]
+            rho[idep, ilon, 181 - ilat] = rhor[itable, idep]
+            vp[idep, ilon, 181 - ilat] = vpr[itable, idep]
+            vs[idep, ilon, 181 - ilat] = vsr[itable, idep]
+        end
+    end
+
+    io = open(crust1_0_dir("psr3d.bin"), "w")
+    write(io, Int64(6))
+    _write_f64_vector!(io, reverse(lats))
+    _write_f64_vector!(io, lons)
+    _write_f64_array(io, dep)
+    _write_f64_array(io, vp)
+    _write_f64_array(io, vs)
+    _write_f64_array(io, rho)
+    close(io)
+    return nothing
+end
+
+# =============================
+# IASP91
+# =============================
+iasp91_dir(p...) = abspath(DATABASE_PATH, "VelocityModel", "IASP91", p...)
+
+function iasp91_download()
+    if !isfile(iasp91_dir("IASP91.csv"))
+        @info "Download IASP91"
+        mkpath(iasp91_dir())
+        Downloads.download("http://ds.iris.edu/files/products/emc/data/IASP91/IASP91.csv", iasp91_dir("IASP91.csv"))
+    end
+    return nothing
+end
+
+function iasp91_build_db()
+    @info "Build IASP91"
+    x = readdlm(iasp91_dir("IASP91.csv"), ',')
+
+    flag_diff = map(axes(x, 1)) do i
+        if i == 1
+            return true
+        end
+        return !(x[i,3:end] == x[i-1,3:end])
+    end
+
+    y = x[flag_diff, :]
+
+    dep = y[:, 1]
+    r = y[:, 2]
+    vp = y[:, 3]
+    vs = y[:, 4]
+
+
+    io1 = open(iasp91_dir("flat.bin"), "w")
+    write(io1, Int64(3))
+    _write_f64_vector!(io1, dep)
+    _write_f64_vector!(io1, vp)
+    _write_f64_vector!(io1, vs)
+    close(io1)
+
+    io2 = open(iasp91_dir("sphere.bin"), "w")
+    write(io2, Int64(3))
+    _write_f64_vector!(io2, reverse(r))
+    _write_f64_vector!(io2, reverse(vp))
+    _write_f64_vector!(io2, reverse(vs))
+    close(io2)
+    return nothing
+end
+
+# =============================
+# PREM
+# =============================
+prem_dir(p...) = abspath(DATABASE_PATH, "VelocityModel", "PREM", p...)
+
+function prem_download()
+    if !isfile(prem_dir("PREM.csv"))
+        @info "Download PREM"
+        mkpath(prem_dir())
+        Downloads.download("http://ds.iris.edu/files/products/emc/data/PREM/PREM_1s.csv", prem_dir("PREM.csv"))
+    end
+    return nothing
+end
+
+function prem_build_db()
+    @info "Build PREM"
+    x = readdlm(prem_dir("PREM.csv"), ',')
+
+    flag_diff = map(axes(x, 1)) do i
+        if i == 1
+            return true
+        end
+        return !(x[i,3:end] == x[i-1,3:end])
+    end
+
+    y = x[flag_diff, :]
+
+
+    r = y[:, 1]
+    dep = y[:, 2]
+    rho = y[:, 3]
+    vp = y[:, 4]
+    vs = y[:, 6]
+    eta = y[:, 8]
+    Qm = y[:, 9]
+    Qk = y[:, 10]
+
+    io1 = open(prem_dir("flat.bin"), "w")
+    write(io1, Int64(6))
+    _write_f64_vector!(io1, dep)
+    _write_f64_vector!(io1, vp)
+    _write_f64_vector!(io1, vs)
+    _write_f64_vector!(io1, rho)
+    _write_f64_vector!(io1, Qk)
+    _write_f64_vector!(io1, Qm)
+    close(io1)
+
+    io2 = open(prem_dir("sphere.bin"), "w")
+    write(io2, Int64(6))
+    _write_f64_vector!(io2, reverse(r))
+    _write_f64_vector!(io2, reverse(vp))
+    _write_f64_vector!(io2, reverse(vs))
+    _write_f64_vector!(io2, reverse(rho))
+    _write_f64_vector!(io2, reverse(Qk))
+    _write_f64_vector!(io2, reverse(Qm))
+    close(io2)
+    return nothing
 end

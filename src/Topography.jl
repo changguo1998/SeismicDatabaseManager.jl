@@ -1,8 +1,3 @@
-module Topography
-
-using Mmap, TOML, Downloads, Printf
-
-include("basic.jl")
 
 function _inside_area(x::Real, vx::AbstractVector{<:Real}, y::Real, vy::AbstractVector{<:Real})
     return (x >= vx[1]) && (x <= vx[end]) && (y >= vy[1]) && (y <= vy[end])
@@ -156,8 +151,12 @@ function elevation(dem::DEM, x::Real, y::Real)
 end
 
 # =============================
+# SRTM90
+# =============================
 
-function download_srtm_block(lat::Real, lon::Real)
+srtm_dir(p...) = abspath(DATABASE_PATH, "Topography", "SRTM90", p...)
+
+function srtm_download_block(lat::Real, lon::Real)
     if (lat <= -60) || (lat >= 60)
         error("lat out of bound")
     end
@@ -168,7 +167,7 @@ function download_srtm_block(lat::Real, lon::Real)
     Nolon = floor(Int, (180 + lon) / 5.0) + 1
     blockfilename = @sprintf("srtm_%02d_%02d.zip", Nolon, Nolat)
     url_s = "https://srtm.csi.cgiar.org/wp-content/uploads/files/srtm_5x5/ASCII/" * blockfilename
-    dat_s = abspath(@__DIR__, "../external/Topography/SRTM90/raw_data", blockfilename)
+    dat_s = srtm_dir("raw_data", blockfilename)
     if isfile(dat_s)
         @info "block data $blockfilename already exists"
     else
@@ -179,4 +178,57 @@ function download_srtm_block(lat::Real, lon::Real)
     return nothing
 end
 
+function _srtm_get_par(io::IO, T::Type)
+    t = readline(io)
+    l = split(t, ' ', keepempty=false)
+    return parse(T, l[2])
+end
+
+function _read_asc_header(fn::String)
+    io = open(fn)
+    ncol = _srtm_get_par(io, Int)
+    nrow = _srtm_get_par(io, Int)
+    olon = _srtm_get_par(io, Float64)
+    olat = _srtm_get_par(io, Float64)
+    dd = _srtm_get_par(io, Float64)
+    nanvalue = _srtm_get_par(io, Float64)
+    close(io)
+    return (nrow, ncol, olat, olon, dd, nanvalue)
+end
+
+function srtm_build_db()
+    zip_files = readdir(srtm_dir("raw_data"))
+
+    for zf in zip_files
+        local ascf = replace(zf, ".zip"=>".asc")
+        if isfile(srtm_dir("buffer", ascf))
+            continue
+        end
+        cmd = Cmd(["unzip", "-o", srtm_dir("raw_data", zf), "-d", srtm_dir("buffer")])
+        run(cmd)
+    end
+
+    ascfiles = filter(endswith(".asc"), srtm_dir("buffer"))
+    for af in ascfiles
+        @info "Build block database: $af"
+        local splitnm = splitext(af)
+        local newname = "block_" * splitnm[1] * ".bin"
+        if isfile(newname)
+            continue
+        end
+        local nrow, ncol, olat, olon, dd, nanvalue
+        (nrow, ncol, olat, olon, dd, nanvalue) = _read_asc_header(srtm_dir("buffer", af))
+        local lon = range(olon, olon+5.0, ncol)
+        local lat = range(olat, olat+5.0, nrow)
+        local m = readdlm(srtm_dir("buffer", af); skipstart=6)
+        reverse!(m, dims=1)
+        m = permutedims(m)
+        m[m.==nanvalue] .= NaN
+        local io = open(srtm_dir(newname), "w")
+        _write_f64_vector!(io, collect(lat))
+        _write_f64_vector!(io, collect(lon))
+        _write_f64_array(io, m)
+        close(io)
+    end
+    return nothing
 end

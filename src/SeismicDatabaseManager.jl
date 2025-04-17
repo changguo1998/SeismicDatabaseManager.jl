@@ -14,7 +14,9 @@ See `Source`, `Receiver`, `Event`, `GreenLibrary` for their usage
 """
 module SeismicDatabaseManager
 
-using SeisTools, Dates, LengthAreaVolume, TOML
+using SeisTools, Dates, LengthAreaVolume, TOML, Mmap, Downloads, Printf, DelimitedFiles
+
+import Base: Matrix, close
 
 _DP = SeisTools.DataProcess
 
@@ -27,21 +29,29 @@ include("Topography.jl")
 include("VelocityModel.jl")
 
 function download_external_data()
-    external_path = abspath(@__DIR__, "..", "external")
-    cmd1 = Cmd(Cmd(["julia", "download_model.jl"]); dir = joinpath(external_path, "VelocityModel"))
-    run(cmd1)
+    if !isdir(DATABASE_PATH)
+        @error "Database path not exist"
+        return nothing
+    end
+    ak135_download()
+    crust1_0_download()
+    iasp91_download()
+    prem_download()
+    @info "Done"
+    return nothing
 end
 
 function build_external_database()
-    external_path = abspath(@__DIR__, "..", "external")
-    cmd1 = Cmd(Cmd(["julia", "convert_format.jl"]); dir = joinpath(external_path, "VelocityModel"))
-    run(cmd1)
-    cmd2 = Cmd(Cmd(["julia", "convert_format.jl"]); dir = joinpath(external_path, "Topography"))
-    run(cmd2)
-end
-
-function install_path()
-    return abspath(@__DIR__, "..")
+    if !isdir(DATABASE_PATH)
+        @error "Database path not exist"
+        return nothing
+    end
+    ak135_build_db()
+    crust1_0_build_db()
+    iasp91_build_db()
+    prem_build_db()
+    @info "Done"
+    return nothing
 end
 
 end # module SeismicDatabaseManager

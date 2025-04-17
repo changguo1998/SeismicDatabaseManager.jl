@@ -160,3 +160,56 @@ function decode_event(str::String)
     return (lat, lon, DateTime(_REF_YEAR, _REF_MONTH, _REF_DAY, h, m, s) +
                       Day(nday))
 end
+
+# IO
+
+function _read_f64_vector(io::IO)
+    n = read(io, Int64)
+    v = zeros(Float64, n)
+    read!(io, v)
+    return v
+end
+
+function _write_f64_vector!(io::IO, v::Vector{<:Real})
+    b = zeros(Float64, length(v))
+    b .= Float64.(v)
+    n = Int64(length(b))
+    write(io, n)
+    write(io, b)
+    return nothing
+end
+
+function _read_f64_array(io::IO)
+    dm = read(io, Int64)
+    sz = zeros(Int64, dm)
+    read!(io, sz)
+    arr = zeros(Float64, Tuple(sz))
+    read!(io, arr)
+    return arr
+end
+
+function _write_f64_array(io::IO, arr::Array{<:Real})
+    dm = ndims(arr)
+    sz = zeros(Int64, dm)
+    sz .= size(arr)
+    buf = zeros(Float64, size(arr))
+    buf .= Float64.(arr)
+    write(io, Int64(dm))
+    write(io, sz)
+    write(io, buf)
+    return nothing
+end
+
+# global variables
+
+global DATABASE_PATH = ""
+
+function set_db_path!(path::AbstractString)
+    global DATABASE_PATH
+    if ispath(path)
+        DATABASE_PATH = path
+    else
+        @error "Path not exist. Nothing is changed"
+    end
+    return nothing
+end

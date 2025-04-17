@@ -5,11 +5,19 @@ version = "0.1.0"
 
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 LengthAreaVolume = "efc29244-82b9-40dc-80c2-83e112b54aab"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Mmap = "a63ad114-7e13-5084-954f-fe012c677804"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 SeisTools = "1a3a5297-0f7d-450c-8955-231a439346a8"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 
 [compat]
+DelimitedFiles = "1.9.1"
+Downloads = "1.6.0"
+Mmap = "1.11.0"
+Printf = "1.11.0"
 TOML = "1.0.3"
