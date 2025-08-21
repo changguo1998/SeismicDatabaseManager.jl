@@ -27,6 +27,7 @@ include("Event.jl")
 include("GreenLibrary.jl")
 include("Topography.jl")
 include("VelocityModel.jl")
+include("TimeSeries.jl")
 
 function download_external_data()
     if !isdir(DATABASE_PATH)
