@@ -1,6 +1,16 @@
 
 const TIME_SERIES_REGULAR_HEADER = TOML.parsefile(joinpath(@__DIR__, "../template/TimeSeriesRegular.toml"))
 const TIME_SERIES_REGULAR_TEXT_HEADER_SIZE = 1024
+const WRITE_LOCK_FILE_PATH = abspath(@__DIR__, "TIME_SERIES_REGULAR_WRITE_LOCK.txt")
+
+function _lock_write()
+    return open(WRITE_LOCK_FILE_PATH, "w")
+end
+
+function _unlock_write(lk::IO)
+    close(lk)
+    return nothing
+end
 
 function _new_regular_time_series_file_header(hdr::Dict)
     new_hdr = deepcopy(TIME_SERIES_REGULAR_HEADER)
@@ -87,10 +97,12 @@ function _create_regular_time_series_file(fp::String, meta::Dict, bt::DateTime, 
     hdr["dt_us"] = dt.value
     hdr["n_sample"] = length(data)
     hdr["sample_type"] = _type2string(eltype(data))
+    lk = _lock_write()
     io = open(fp, "w")
     _write_regular_time_series_file_header(io, hdr)
     write(io, data)
     close(io)
+    _unlock_write(lk)
     return nothing
 end
 
@@ -129,11 +141,13 @@ function _overwrite_regular_time_series_file(fp::String, bt::DateTime, dt::Perio
         return nothing
     end
     ishift = floor(Int, round(bt - fbt, Microsecond)/fdt)
-    io = open(fp, "w+")
+    lk = _lock_write()
+    io = open(fp, "r+")
     data_disk = Mmap.mmap(io, Vector{fT}, (hdr["n_sample"],), ishift*sizeof(fT)+TIME_SERIES_REGULAR_TEXT_HEADER_SIZE)
     data_disk[1:length(data)] .= data
     Mmap.sync!(data_disk)
     close(io)
+    _unlock_write(lk)
     return nothing
 end
 
@@ -235,10 +249,12 @@ function _merge_regular_time_series_file(fp1::String, fp2::String, fp::String)
     hdr["begin_time"] = min(bt1, bt2)
     hdr["n_sample"] = length(dat)
     dat = _merge_regular_time_series(bt1, dat1, bt2, dat2, dt)
+    lk = _lock_write()
     open(fp, "w") do io
         _write_regular_time_series_file_header(io, hdr)
         write(io, dat)
     end
+    _unlock_write(lk)
 end
 
 export update_index_regular_time_series_db
@@ -269,12 +285,87 @@ function update_index_regular_time_series_db(dir::String, fp::String)
         "datadir" => abspath(dir),
         "metadata" => Dict(collect(zip(filelist, hdrlist)))
     )
+    lk = _lock_write()
     open(io->TOML.print(io, indexDB), fp, "w")
+    _unlock_write(lk)
     return nothing
 end
 
-# TODO
-function update_regular_time_series()
+# function _randstr(n::Integer)
+#     return String(rand(['a':'z'; 'A':'Z'; '0':'9'], n))
+# end
+
+export update_regular_time_series
+
+"""
+```julia
+update_regular_time_series(indexfile, header, data)
+```
+"""
+function update_regular_time_series(indexfile::String, header::Dict, data::Vector)
+    hdr = _new_regular_time_series_file_header(header)
+    bt = hdr["begin_time"]
+    dt = Microsecond(hdr["dt_us"])
+    et = bt + dt * hdr["n_sample"]
+    indexDB = TOML.parsefile(indexfile)
+    exist_files = _find_regular_time_series_file(indexfile, header; begintime=bt, endtime=et)
+    if isempty(exist_files)
+        # not overlap with any file
+        _create_regular_time_series_file(joinpath(indexDB["datadir"], _randstr(8)*".bin"),
+        hdr, bt, dt, data)
+        update_index_regular_time_series_db(indexDB["datadir"], indexfile)
+        return nothing
+    end
+
+    # overlap exist
+    bt_list = map(exist_files) do f
+        (_, fn) = splitdir(f)
+        hdr = indexDB["metadata"][fn]
+        return hdr["begin_time"]
+    end
+    et_list = map(exist_files) do f
+        (_, fn) = splitdir(f)
+        hdr = indexDB["metadata"][fn]
+        return hdr["begin_time"] + Microsecond(hdr["dt_us"]) * hdr["n_sample"]
+    end
+    # segment queue
+    tmp_segments = [(bt=bt, dt=dt, data=data)]
+    while !isempty(tmp_segments)
+        println("=================")
+        for s in tmp_segments
+            println("- ", s.bt, " ", length(s.data))
+        end
+        seg = popfirst!(tmp_segments)
+        et = seg.bt + seg.dt * length(seg.data)
+        j = 0
+        for i = eachindex(bt_list)
+            if (seg.bt >= et_list[i]) || (et <= bt_list[i])
+                continue
+            end
+            j = i
+            break
+        end
+        if iszero(j)
+            _create_regular_time_series_file(joinpath(indexDB["datadir"], _randstr(8)*".bin"),
+                hdr, seg.bt, seg.dt, seg.data)
+            continue
+        end
+        if (seg.bt >= bt_list[j]) && (et <= et_list[j])
+            _overwrite_regular_time_series_file(exist_files[j], seg.bt, dt, seg.data)
+            continue
+        end
+        if seg.bt < bt_list[j]
+            (s1, s2) = _split_regular_time_series(seg.bt, seg.dt, seg.data, bt_list[j])
+            push!(tmp_segments, s1)
+            push!(tmp_segments, s2)
+        else
+            (s1, s2) = _split_regular_time_series(seg.bt, seg.dt, seg.data, et_list[j])
+            push!(tmp_segments, s1)
+            push!(tmp_segments, s2)
+        end
+    end
+    update_index_regular_time_series_db(indexDB["datadir"], indexfile)
+    return nothing
 end
 
 function _header_is_matched(hdr::Dict, pattern::Dict)
@@ -301,7 +392,7 @@ function _find_regular_time_series_file(indexfile::String, pattern::Dict;
 
     for k in keys(indexDB["metadata"])
         hdr = indexDB["metadata"][k]
-        if endtime < hdr["begin_time"]
+        if endtime <= hdr["begin_time"]
             continue
         end
         if begintime >= hdr["begin_time"] + Microsecond(hdr["dt_us"]) * hdr["n_sample"]

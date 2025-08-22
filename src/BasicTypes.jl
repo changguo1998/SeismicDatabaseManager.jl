@@ -215,3 +215,7 @@ function set_db_path!(path::AbstractString)
     end
     return nothing
 end
+
+function _randstr(n::Integer)
+    return String(rand(['a':'z'; 'A':'Z'; '0':'9'], n))
+end

@@ -101,9 +101,9 @@ end
 
 export getgreenfun
 
-function _randstr(N::Integer = 8)
-    return String(rand('A':'Z', N))
-end
+# function _randstr(N::Integer = 8)
+#     return String(rand('A':'Z', N))
+# end
 
 function pushgreenlib(glib::GreenLibrary, gfile::AbstractString)
     metafile = joinpath(glib.dir, "meta.toml")
