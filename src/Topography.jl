@@ -51,7 +51,7 @@ function close(dem::DEM_block_memory)
     return nothing
 end
 
-in(dem::DEM_block_memory, x::Real, y::Real) = _inside_area(x, dem.x, y, dem.y)
+# Base.in(dem::DEM_block_memory, x::Real, y::Real) = _inside_area(x, dem.x, y, dem.y)
 
 function elevation(dem::DEM_block_memory, x::Real, y::Real)
     if !in(dem, x, y)
@@ -87,7 +87,7 @@ function close(dem::DEM_block_disk)
     end
 end
 
-in(dem::DEM_block_disk, x::Real, y::Real) = _inside_area(x, dem.x, y, dem.y)
+# in(dem::DEM_block_disk, x::Real, y::Real) = _inside_area(x, dem.x, y, dem.y)
 
 function elevation(dem::DEM_block_disk, x::Real, y::Real)
     if !in(dem, x, y)
@@ -140,7 +140,7 @@ end
 
 close(dem::DEM) = close.(dem.blockData)
 
-in(dem::DEM, x::Real, y::Real) = any(d -> in(d, x, y), dem.blockData)
+# in(dem::DEM, x::Real, y::Real) = any(d -> in(d, x, y), dem.blockData)
 
 function elevation(dem::DEM, x::Real, y::Real)
     iblock = findfirst(b -> in(b, x, y), dem.blockData)

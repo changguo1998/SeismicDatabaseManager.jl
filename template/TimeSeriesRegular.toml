@@ -1,5 +1,12 @@
-tag = ""
-begin_time = 1800-01-01T00:00:00.000+00:00
-dt_us = 10000
+begin_time = 1800-01-01T00:00:00.000
+dt_us = 0
 n_sample = 0
 sample_type = "f32"
+
+tag = ""
+network = ""
+station = ""
+channel = ""
+variable = ""
+unit = ""
+instrument_type = ""

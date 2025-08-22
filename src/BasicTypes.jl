@@ -3,9 +3,11 @@
 TIME_PRECISION = Microsecond(1)
 SECOND_PRECISION_RATIO = Second(1) / TIME_PRECISION
 
-const LongAgo = DateTime(1800)
+const DISTANT_PAST = DateTime(1800)
+const DISTANT_FUTURE = DateTime(3000)
 
-export LongAgo
+export DISTANT_PAST, DISTANT_FUTURE
+
 
 """
 set_time_precision(t::TimePeriod)
