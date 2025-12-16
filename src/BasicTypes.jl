@@ -108,7 +108,8 @@ const _REF_DATETIME = julian2datetime(_REF_JULIAN)
 const _REF_YEAR     = year(_REF_DATETIME)
 const _REF_MONTH    = month(_REF_DATETIME)
 const _REF_DAY      = day(_REF_DATETIME)
-const _CHAR_SET     = Tuple([collect('A':'Z'); collect('a':'z'); collect('0':'9')])
+const _CHAR_SET     = Tuple([collect('0':'9'); collect('a':'z'); collect('A':'Z')])
+const _CHAR_SET_LEN = length(_CHAR_SET)
 
 function _areacode_f2s(x::Real, r::Real, level::Integer)
     t = mod(x, r)
@@ -129,18 +130,48 @@ function _areacode_s2f(s::String, dr::Real)
     return f3 + dr * (i2 - 1) + dr * 60.0 * (i1 - 1)
 end
 
-function encode_ll(lat::Real, lon::Real)
-    (slat, rlat) = _areacode_f2s(90.0 - lat, 180.0, 2)
-    (slon, rlon) = _areacode_f2s(180.0 + lon, 360.0, 2)
-    clat = string(round(Int, rlat / 0.01))
-    clon = string(round(Int, rlon / 0.01))
-    return slat * clat * slon * clon
+function _encode_string_len(range::Real, precision::Real)
+    return ceil(Int, log1p(range/precision) / log(_CHAR_SET_LEN))
+end
+
+_encode_string_max_number(n::Integer) = (_CHAR_SET_LEN^n)-1
+
+function _areacode_float2string(x::Real, range::Real, precision::Real)
+    level = _encode_string_len(range, precision)
+    v = round(Int, x * _encode_string_max_number(level) / range)
+    ilist = ones(Int, level)
+    for i = 1:level
+        (v, p) = divrem(v, _CHAR_SET_LEN)
+        ilist[level-i+1] = round(Int, p) + 1
+    end
+    return join(_CHAR_SET[ilist])
+end
+
+function _areacode_string2float(s::String, range::Real)
+    level = length(s)
+    v = 0
+    for c = collect(s)
+        v *= _CHAR_SET_LEN
+        v += findfirst(isequal(c), _CHAR_SET)-1
+    end
+    return v * range / _encode_string_max_number(level)
+end
+
+function encode_ll(lat::Real, lon::Real; precision::Real=0.0001)
+    llat = _encode_string_len(180.0, precision)
+    slat = _areacode_float2string(90.0 - lat, 180.0, precision)
+    slon = _areacode_float2string(180.0 + lon, 360.0, precision)
+    return join([slat, slon, _CHAR_SET[llat]])
 end
 
 function decode_ll(s::String)
-    t = _areacode_s2f(String(s[1:3]), 0.05)
-    p = _areacode_s2f(String(s[4:6]), 0.1)
-    return (round(90.0 - t; digits = 2), round(p - 180.0; digits = 2))
+    llat = findfirst(==(s[end]), _CHAR_SET)
+    llon = length(s) - llat - 1
+    t = _areacode_string2float(String(s[1:llat]), 180.0)
+    p = _areacode_string2float(String(s[llat+1:end-1]), 360.0)
+    elat = ceil(Int, llat * log10(_CHAR_SET_LEN) - log10(180.0))
+    elon = ceil(Int, llon * log10(_CHAR_SET_LEN) - log10(360.0))
+    return (round(90.0 - t; digits = elat), round(p - 180.0; digits = elon))
 end
 
 function encode_event(lat::Real, lon::Real, ot::DateTime)
