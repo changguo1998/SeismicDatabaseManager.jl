@@ -169,8 +169,8 @@ function decode_ll(s::String)
     llon = length(s) - llat - 1
     t = _areacode_string2float(String(s[1:llat]), 180.0)
     p = _areacode_string2float(String(s[llat+1:end-1]), 360.0)
-    elat = ceil(Int, llat * log10(_CHAR_SET_LEN) - log10(180.0))
-    elon = ceil(Int, llon * log10(_CHAR_SET_LEN) - log10(360.0))
+    elat = floor(Int, log10(_encode_string_max_number(llat)) - log10(180.0))
+    elon = floor(Int, log10(_encode_string_max_number(llon)) - log10(360.0))
     return (round(90.0 - t; digits = elat), round(p - 180.0; digits = elon))
 end
 

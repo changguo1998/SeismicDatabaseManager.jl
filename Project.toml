@@ -1,6 +1,6 @@
 name = "SeismicDatabaseManager"
 uuid = "84372de5-a21e-444f-9e32-3247706d4e35"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Chang Guo <changguo1998@gmail.com"]
 
 [deps]
